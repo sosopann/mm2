@@ -1,4 +1,5 @@
-import { pgTable, text, varchar, integer, real } from "drizzle-orm/pg-core";
+import { sql } from 'drizzle-orm';
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -26,6 +27,44 @@ export const RARITIES = [
 ] as const;
 
 export type Rarity = typeof RARITIES[number];
+
+// Order status
+export const ORDER_STATUSES = [
+  "pending",
+  "awaiting_payment",
+  "payment_uploaded",
+  "confirmed",
+  "processing",
+  "completed",
+  "cancelled"
+] as const;
+
+export type OrderStatus = typeof ORDER_STATUSES[number];
+
+// Session storage table (required for Replit Auth)
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table (required for Replit Auth)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
 
 // Product table schema
 export const products = pgTable("products", {
@@ -55,19 +94,23 @@ export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: tru
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;
 
-// Order schema
+// Order schema with user reference and receipt
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
+  userId: varchar("user_id"),
   email: text("email").notNull(),
   robloxUsername: text("roblox_username").notNull(),
   paymentMethod: text("payment_method").notNull(),
   paymentReference: text("payment_reference"),
   totalAmount: real("total_amount").notNull(),
   status: text("status").notNull().default("pending"),
-  items: text("items").notNull(), // JSON string of cart items
+  items: text("items").notNull(),
+  receiptUrl: text("receipt_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
@@ -95,18 +138,3 @@ export const contactFormSchema = z.object({
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;
-
-// Users table (kept from original)
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
-
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;

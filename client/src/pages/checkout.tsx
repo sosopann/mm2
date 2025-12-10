@@ -20,33 +20,21 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useCart } from "@/lib/cart-context";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { checkoutFormSchema, type CheckoutFormData } from "@shared/schema";
 
-const PAYMENT_INFO = {
-  vodafone_cash: {
-    name: "Vodafone Cash",
-    number: "01XXXXXXXXX",
-    instructions: "Transfer the exact amount to the number above and send a screenshot of the payment confirmation to our contact.",
-  },
-  instapay: {
-    name: "InstaPay",
-    id: "mm2shop@instapay",
-    instructions: "Send the exact amount to the InstaPay ID above and provide the transaction reference number.",
-  },
-};
-
 export default function CheckoutPage() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [orderComplete, setOrderComplete] = useState(false);
 
   const form = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: {
-      email: "",
+      email: user?.email || "",
       robloxUsername: "",
       paymentMethod: "vodafone_cash",
       paymentReference: "",
@@ -76,13 +64,13 @@ export default function CheckoutPage() {
       const response = await apiRequest("POST", "/api/orders", orderData);
       return response.json();
     },
-    onSuccess: () => {
-      setOrderComplete(true);
+    onSuccess: (order) => {
       clearCart();
       toast({
         title: "Order Placed!",
-        description: "We'll deliver your items after payment confirmation.",
+        description: "Redirecting to payment page...",
       });
+      setLocation(`/payment/${order.id}`);
     },
     onError: (error) => {
       toast({
@@ -114,7 +102,7 @@ export default function CheckoutPage() {
 
   const isSubmitting = createOrderMutation.isPending;
 
-  if (items.length === 0 && !orderComplete) {
+  if (items.length === 0) {
     return (
       <div className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center">
         <AlertCircle className="mb-4 h-16 w-16 text-muted-foreground" />
@@ -132,43 +120,6 @@ export default function CheckoutPage() {
     );
   }
 
-  if (orderComplete) {
-    return (
-      <div className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center">
-        <div className="relative mb-6">
-          <CheckCircle className="h-20 w-20 text-primary" />
-          <div className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-primary/20 blur-xl" />
-        </div>
-        <h1 className="mb-2 font-heading text-3xl font-bold uppercase tracking-wider">
-          Order Placed!
-        </h1>
-        <p className="mb-6 max-w-md text-muted-foreground">
-          Thank you for your order! We'll deliver your MM2 items within 5-30 minutes after we confirm your payment.
-        </p>
-        <div className="mb-8 rounded-lg border border-border bg-card p-4 text-left">
-          <h3 className="mb-2 font-semibold">Next Steps:</h3>
-          <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
-            <li>Complete your payment using {PAYMENT_INFO[form.getValues("paymentMethod") as keyof typeof PAYMENT_INFO].name}</li>
-            <li>Send payment confirmation screenshot to our contact</li>
-            <li>We'll deliver your items to your Roblox account</li>
-          </ol>
-        </div>
-        <div className="flex gap-4">
-          <Link href="/shop">
-            <Button variant="outline" className="gap-2">
-              Continue Shopping
-            </Button>
-          </Link>
-          <Link href="/contact">
-            <Button className="gap-2">
-              Contact Support
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
@@ -182,6 +133,11 @@ export default function CheckoutPage() {
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wider">
             Checkout
           </h1>
+          {!isAuthenticated && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              <a href="/api/login" className="text-primary hover:underline">Sign in</a> to track your orders
+            </p>
+          )}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -271,30 +227,9 @@ export default function CheckoutPage() {
                                     </div>
                                     Vodafone Cash
                                   </Label>
-                                  {selectedPayment === "vodafone_cash" && (
-                                    <div className="mt-3 space-y-2">
-                                      <div className="flex items-center gap-2 rounded-md bg-muted p-2">
-                                        <span className="text-sm font-mono">
-                                          {PAYMENT_INFO.vodafone_cash.number}
-                                        </span>
-                                        <Button
-                                          type="button"
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-6 w-6"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            copyToClipboard(PAYMENT_INFO.vodafone_cash.number);
-                                          }}
-                                        >
-                                          <Copy className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                      <p className="text-sm text-muted-foreground">
-                                        {PAYMENT_INFO.vodafone_cash.instructions}
-                                      </p>
-                                    </div>
-                                  )}
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Pay via Vodafone Cash transfer
+                                  </p>
                                 </div>
                               </div>
 
@@ -321,30 +256,9 @@ export default function CheckoutPage() {
                                     </div>
                                     InstaPay
                                   </Label>
-                                  {selectedPayment === "instapay" && (
-                                    <div className="mt-3 space-y-2">
-                                      <div className="flex items-center gap-2 rounded-md bg-muted p-2">
-                                        <span className="text-sm font-mono">
-                                          {PAYMENT_INFO.instapay.id}
-                                        </span>
-                                        <Button
-                                          type="button"
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-6 w-6"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            copyToClipboard(PAYMENT_INFO.instapay.id);
-                                          }}
-                                        >
-                                          <Copy className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                      <p className="text-sm text-muted-foreground">
-                                        {PAYMENT_INFO.instapay.instructions}
-                                      </p>
-                                    </div>
-                                  )}
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Pay via InstaPay transfer
+                                  </p>
                                 </div>
                               </div>
                             </RadioGroup>
@@ -357,8 +271,7 @@ export default function CheckoutPage() {
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        After placing your order, complete the payment and send proof to our contact. 
-                        Items will be delivered within 5-30 minutes of payment confirmation.
+                        After placing your order, you'll see the payment details and can upload your receipt.
                       </AlertDescription>
                     </Alert>
                   </CardContent>
@@ -371,7 +284,7 @@ export default function CheckoutPage() {
                   disabled={isSubmitting}
                   data-testid="button-place-order"
                 >
-                  {isSubmitting ? "Processing..." : "Place Order"}
+                  {isSubmitting ? "Processing..." : "Place Order & Pay"}
                 </Button>
               </form>
             </Form>

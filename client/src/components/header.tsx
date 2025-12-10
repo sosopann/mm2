@@ -1,23 +1,19 @@
 import { Link, useLocation } from "wouter";
-import { ShoppingCart, Search, Menu, X, Sword } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, Sword, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCart } from "@/lib/cart-context";
+import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { CATEGORIES } from "@shared/schema";
-
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/shop", label: "Shop" },
-  ...CATEGORIES.map((cat) => ({ href: `/shop?category=${cat}`, label: cat })),
-  { href: "/contact", label: "Contact" },
-];
 
 export function Header() {
   const [location] = useLocation();
   const { totalItems } = useCart();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -117,6 +113,46 @@ export function Header() {
             </Button>
           </Link>
 
+          {!isLoading && (
+            isAuthenticated ? (
+              <Link href="/account">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="relative"
+                  data-testid="button-account"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="text-xs">
+                      {user?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </Link>
+            ) : (
+              <a href="/api/login">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="hidden gap-2 sm:flex"
+                  data-testid="button-login"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="sm:hidden"
+                  data-testid="button-login-mobile"
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              </a>
+            )
+          )}
+
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
@@ -185,6 +221,29 @@ export function Header() {
                         Contact
                       </Button>
                     </Link>
+                    {isAuthenticated ? (
+                      <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
+                        <Button
+                          variant={location === "/account" ? "secondary" : "ghost"}
+                          className="w-full justify-start gap-2"
+                          data-testid="mobile-link-account"
+                        >
+                          <User className="h-4 w-4" />
+                          My Account
+                        </Button>
+                      </Link>
+                    ) : (
+                      <a href="/api/login" onClick={() => setMobileMenuOpen(false)}>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2"
+                          data-testid="mobile-link-login"
+                        >
+                          <LogIn className="h-4 w-4" />
+                          Sign In
+                        </Button>
+                      </a>
+                    )}
                   </div>
                 </nav>
               </div>
