@@ -59,7 +59,19 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden rounded-t-lg bg-muted/30">
             <div className={`flex h-full items-center justify-center bg-gradient-to-br ${rarityGradients[product.rarity] || rarityGradients.Common}`}>
-              <div className="text-center px-2">
+              {product.imageUrl ? (
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name}
+                  className="h-full w-full object-contain p-2"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div className={`text-center px-2 ${product.imageUrl ? 'hidden' : ''}`}>
                 {(() => {
                   const IconComponent = rarityIcons[product.rarity] || Sword;
                   return <IconComponent className="mx-auto h-16 w-16 text-foreground/50" />;

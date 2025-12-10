@@ -77,7 +77,19 @@ export default function ProductPage() {
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/30">
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted">
-              <div className="text-center">
+              {product.imageUrl ? (
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name}
+                  className="h-full w-full object-contain p-4"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div className={`text-center ${product.imageUrl ? 'hidden' : ''}`}>
                 <div className="mb-4 text-8xl font-bold text-primary/20">
                   {product.name.charAt(0)}
                 </div>
