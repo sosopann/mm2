@@ -36,7 +36,7 @@ export default function CheckoutPage() {
   const form = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: {
-      email: user?.email || "",
+      phone: "",
       robloxUsername: "",
       paymentMethod: "vodafone_cash",
       paymentReference: "",
@@ -55,7 +55,7 @@ export default function CheckoutPage() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: {
-      email: string;
+      phone: string;
       robloxUsername: string;
       paymentMethod: string;
       paymentReference?: string;
@@ -85,7 +85,7 @@ export default function CheckoutPage() {
 
   const onSubmit = async (data: CheckoutFormData) => {
     const orderData = {
-      email: data.email,
+      phone: data.phone,
       robloxUsername: data.robloxUsername,
       paymentMethod: data.paymentMethod,
       paymentReference: data.paymentReference || "",
@@ -171,16 +171,16 @@ export default function CheckoutPage() {
                   <CardContent className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="email"
+                      name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email Address</FormLabel>
+                          <FormLabel>Phone Number</FormLabel>
                           <FormControl>
                             <Input
-                              type="email"
-                              placeholder="your.email@example.com"
+                              type="tel"
+                              placeholder="01xxxxxxxxx"
                               {...field}
-                              data-testid="input-email"
+                              data-testid="input-phone"
                             />
                           </FormControl>
                           <FormMessage />

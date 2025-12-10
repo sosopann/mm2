@@ -95,7 +95,7 @@ export type CartItem = typeof cartItems.$inferSelect;
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   userId: varchar("user_id"),
-  email: text("email").notNull(),
+  phone: text("phone").notNull(),
   robloxUsername: text("roblox_username").notNull(),
   paymentMethod: text("payment_method").notNull(),
   paymentReference: text("payment_reference"),
@@ -129,7 +129,7 @@ export interface CartItemWithProduct extends CartItem {
 }
 
 export const checkoutFormSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  phone: z.string().min(10, "Please enter a valid phone number").max(15, "Phone number is too long"),
   robloxUsername: z.string().min(3, "Roblox username must be at least 3 characters"),
   paymentMethod: z.enum(["vodafone_cash", "instapay"]),
   paymentReference: z.string().optional(),

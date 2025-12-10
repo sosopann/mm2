@@ -469,8 +469,8 @@ export default function AdminPage() {
               <div className="space-y-4">
                 <div className="grid gap-2 text-sm">
                   <div className="flex justify-between gap-4 flex-wrap">
-                    <span className="text-muted-foreground">Email</span>
-                    <span>{selectedOrder.email}</span>
+                    <span className="text-muted-foreground">Phone</span>
+                    <span>{selectedOrder.phone}</span>
                   </div>
                   <div className="flex justify-between gap-4 flex-wrap">
                     <span className="text-muted-foreground">Roblox</span>
