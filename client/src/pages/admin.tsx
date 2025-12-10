@@ -16,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -292,6 +293,9 @@ export default function AdminPage() {
               <DialogTitle>
                 Order #{selectedOrder?.id.slice(0, 8)}
               </DialogTitle>
+              <DialogDescription>
+                Order details and status management
+              </DialogDescription>
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-4">
