@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -44,7 +44,7 @@ export async function registerRoutes(
   app.use("/uploads", (req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     next();
-  }, require("express").static(uploadsDir));
+  }, express.static(uploadsDir));
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
