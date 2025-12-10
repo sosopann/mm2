@@ -1,9 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, varchar, integer, real, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, index, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Product categories enum
 export const CATEGORIES = [
   "Budget",
   "Standard", 
@@ -15,7 +14,6 @@ export const CATEGORIES = [
 
 export type Category = typeof CATEGORIES[number];
 
-// Rarity levels for visual styling
 export const RARITIES = [
   "Common",
   "Uncommon", 
@@ -28,7 +26,6 @@ export const RARITIES = [
 
 export type Rarity = typeof RARITIES[number];
 
-// Order status
 export const ORDER_STATUSES = [
   "pending",
   "awaiting_payment",
@@ -41,7 +38,6 @@ export const ORDER_STATUSES = [
 
 export type OrderStatus = typeof ORDER_STATUSES[number];
 
-// Session storage table (required for Replit Auth)
 export const sessions = pgTable(
   "sessions",
   {
@@ -52,21 +48,24 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  robloxUsername: varchar("roblox_username"),
   profileImageUrl: varchar("profile_image_url"),
+  isAdmin: boolean("is_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type UpsertUser = typeof users.$inferInsert;
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UpsertUser = typeof users.$inferInsert;
 
-// Product table schema
 export const products = pgTable("products", {
   id: varchar("id").primaryKey(),
   name: text("name").notNull(),
@@ -82,7 +81,6 @@ export const insertProductSchema = createInsertSchema(products).omit({ id: true 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
-// Cart item schema
 export const cartItems = pgTable("cart_items", {
   id: varchar("id").primaryKey(),
   productId: varchar("product_id").notNull(),
@@ -94,7 +92,6 @@ export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: tru
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;
 
-// Order schema with user reference and receipt
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   userId: varchar("user_id"),
@@ -114,12 +111,23 @@ export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, cre
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
-// Cart item with product details (for frontend)
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  senderType: varchar("sender_type").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
 export interface CartItemWithProduct extends CartItem {
   product: Product;
 }
 
-// Checkout form validation
 export const checkoutFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   robloxUsername: z.string().min(3, "Roblox username must be at least 3 characters"),
@@ -129,7 +137,6 @@ export const checkoutFormSchema = z.object({
 
 export type CheckoutFormData = z.infer<typeof checkoutFormSchema>;
 
-// Contact form validation
 export const contactFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
@@ -138,3 +145,20 @@ export const contactFormSchema = z.object({
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;
+
+export const registerFormSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().optional(),
+  robloxUsername: z.string().min(3, "Roblox username must be at least 3 characters"),
+});
+
+export type RegisterFormData = z.infer<typeof registerFormSchema>;
+
+export const loginFormSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type LoginFormData = z.infer<typeof loginFormSchema>;

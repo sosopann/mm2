@@ -15,6 +15,7 @@ import ContactPage from "@/pages/contact";
 import PaymentPage from "@/pages/payment";
 import AccountPage from "@/pages/account";
 import AdminPage from "@/pages/admin";
+import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/payment/:id" component={PaymentPage} />
       <Route path="/account" component={AccountPage} />
+      <Route path="/auth" component={AuthPage} />
       <Route path="/mm2admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>

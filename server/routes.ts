@@ -1,12 +1,16 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertOrderSchema } from "@shared/schema";
+import { registerFormSchema, loginFormSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcryptjs";
+import session from "express-session";
+import memorystore from "memorystore";
+
+const MemoryStore = memorystore(session);
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -34,26 +38,125 @@ const upload = multer({
   },
 });
 
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+    isAdmin?: boolean;
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  await setupAuth(app);
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'mm2-shop-secret-key-2024',
+    resave: false,
+    saveUninitialized: false,
+    store: new MemoryStore({
+      checkPeriod: 86400000
+    }),
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 * 7
+    }
+  }));
 
   app.use("/uploads", (req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     next();
   }, express.static(uploadsDir));
 
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.post("/api/auth/register", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const parsed = registerFormSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByEmail(parsed.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+      
+      const user = await storage.createUser({
+        email: parsed.email,
+        password: parsed.password,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName || null,
+        robloxUsername: parsed.robloxUsername,
+        isAdmin: false,
+        profileImageUrl: null,
+      });
+      
+      req.session.userId = user.id;
+      req.session.isAdmin = false;
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Registration error:", error);
+        res.status(500).json({ error: "Failed to register" });
+      }
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const parsed = loginFormSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(parsed.email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      
+      const validPassword = await bcrypt.compare(parsed.password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      
+      req.session.userId = user.id;
+      req.session.isAdmin = user.isAdmin || false;
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Login error:", error);
+        res.status(500).json({ error: "Failed to login" });
+      }
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to logout" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/user", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      res.status(500).json({ error: "Failed to fetch user" });
     }
   });
 
@@ -61,8 +164,8 @@ export async function registerRoutes(
     try {
       const parsed = insertOrderSchema.parse(req.body);
       let userId = null;
-      if (req.isAuthenticated() && req.user?.claims?.sub) {
-        userId = req.user.claims.sub;
+      if (req.session.userId) {
+        userId = req.session.userId;
       }
       const order = await storage.createOrder({ ...parsed, userId });
       res.json(order);
@@ -89,11 +192,34 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/my-orders", isAuthenticated, async (req: any, res) => {
+  app.get("/api/my-orders", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const orders = await storage.getOrdersByUserId(userId);
-      res.json(orders);
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const ordersByUserId = await storage.getOrdersByUserId(req.session.userId);
+      const ordersByEmail = await storage.getOrdersByEmail(user.email);
+      
+      const allOrders = [...ordersByUserId];
+      for (const order of ordersByEmail) {
+        if (!allOrders.find(o => o.id === order.id)) {
+          allOrders.push(order);
+        }
+      }
+      
+      allOrders.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      res.json(allOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ error: "Failed to fetch orders" });
@@ -118,21 +244,92 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/orders/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const order = await storage.getOrderById(id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      const isAdmin = req.session.isAdmin === true;
+      const isOwner = req.session.userId && (
+        order.userId === req.session.userId ||
+        (async () => {
+          const user = await storage.getUser(req.session.userId!);
+          return user?.email === order.email;
+        })()
+      );
+      
+      const messages = await storage.getChatMessagesByOrderId(id);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/orders/:id/messages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      const order = await storage.getOrderById(id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      let senderId = "guest";
+      let senderType = "customer";
+      
+      if (req.session.userId) {
+        senderId = req.session.userId;
+        const user = await storage.getUser(req.session.userId);
+        senderType = user?.isAdmin ? "admin" : "customer";
+      }
+      
+      const chatMessage = await storage.createChatMessage({
+        orderId: id,
+        senderId,
+        senderType,
+        message: message.trim(),
+      });
+      
+      res.json(chatMessage);
+    } catch (error) {
+      console.error("Chat error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
   app.post("/api/admin/verify", (req, res) => {
     const { password } = req.body;
     const adminPassword = process.env.ADMIN_PASSWORD;
+    
+    if (!adminPassword) {
+      return res.status(500).json({ error: "Admin not configured" });
+    }
+    
     if (password === adminPassword) {
+      req.session.isAdmin = true;
       res.json({ success: true });
     } else {
       res.status(401).json({ error: "Invalid password" });
     }
   });
 
-  app.get("/api/admin/orders", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${process.env.ADMIN_PASSWORD}`) {
+  const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.isAdmin) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+    next();
+  };
+
+  app.get("/api/admin/orders", requireAdmin, async (req, res) => {
     try {
       const orders = await storage.getAllOrders();
       res.json(orders);
@@ -141,11 +338,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/orders/:id/status", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${process.env.ADMIN_PASSWORD}`) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  app.patch("/api/admin/orders/:id/status", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -156,6 +349,38 @@ export async function registerRoutes(
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
+  app.get("/api/admin/chats", requireAdmin, async (req, res) => {
+    try {
+      const chats = await storage.getAllChats();
+      res.json(chats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chats" });
+    }
+  });
+
+  app.post("/api/admin/orders/:id/messages", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      const chatMessage = await storage.createChatMessage({
+        orderId: id,
+        senderId: "admin",
+        senderType: "admin",
+        message: message.trim(),
+      });
+      
+      res.json(chatMessage);
+    } catch (error) {
+      console.error("Admin chat error:", error);
+      res.status(500).json({ error: "Failed to send message" });
     }
   });
 

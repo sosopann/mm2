@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { ShoppingCart, Search, Menu, X, User, LogIn } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -126,15 +126,15 @@ export function Header() {
                 </Button>
               </Link>
             ) : (
-              <a href="/api/login">
+              <Link href="/auth">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="default"
                   className="hidden gap-2 sm:flex"
-                  data-testid="button-login"
+                  data-testid="button-signup"
                 >
-                  <LogIn className="h-4 w-4" />
-                  Sign In
+                  <UserPlus className="h-4 w-4" />
+                  Sign Up
                 </Button>
                 <Button
                   size="icon"
@@ -144,7 +144,7 @@ export function Header() {
                 >
                   <User className="h-5 w-5" />
                 </Button>
-              </a>
+              </Link>
             )
           )}
 
@@ -228,16 +228,16 @@ export function Header() {
                         </Button>
                       </Link>
                     ) : (
-                      <a href="/api/login" onClick={() => setMobileMenuOpen(false)}>
+                      <Link href="/auth" onClick={() => setMobileMenuOpen(false)}>
                         <Button
-                          variant="ghost"
+                          variant="default"
                           className="w-full justify-start gap-2"
-                          data-testid="mobile-link-login"
+                          data-testid="mobile-link-signup"
                         >
-                          <LogIn className="h-4 w-4" />
-                          Sign In
+                          <UserPlus className="h-4 w-4" />
+                          Sign Up
                         </Button>
-                      </a>
+                      </Link>
                     )}
                   </div>
                 </nav>

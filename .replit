@@ -4,6 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["unzip"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -44,4 +45,4 @@ integrations = ["javascript_mem_db:1.0.0", "javascript_database:1.0.0", "javascr
 [userenv]
 
 [userenv.shared]
-ADMIN_PASSWORD = "Yassin980@"
+ADMIN_PASSWORD = "mm2admin2024"

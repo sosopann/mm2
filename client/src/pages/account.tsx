@@ -1,15 +1,18 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { User, Package, Clock, CheckCircle, AlertCircle, ArrowRight, LogOut } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { User, Package, Clock, CheckCircle, AlertCircle, ArrowRight, LogOut, MessageCircle, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import type { Order } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Order, ChatMessage } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-500",
@@ -41,7 +44,129 @@ const statusIcons: Record<string, typeof Clock> = {
   cancelled: AlertCircle,
 };
 
+const statusProgress: Record<string, number> = {
+  pending: 10,
+  awaiting_payment: 20,
+  payment_uploaded: 40,
+  confirmed: 60,
+  processing: 80,
+  completed: 100,
+  cancelled: 0,
+};
+
+function OrderChat({ orderId }: { orderId: string }) {
+  const [message, setMessage] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+
+  const { data: messages = [], isLoading } = useQuery<ChatMessage[]>({
+    queryKey: ["/api/orders", orderId, "messages"],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/${orderId}/messages`);
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      return response.json();
+    },
+    enabled: isOpen,
+    refetchInterval: isOpen ? 5000 : false,
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (msg: string) => {
+      const response = await apiRequest("POST", `/api/orders/${orderId}/messages`, { message: msg });
+      return response.json();
+    },
+    onSuccess: () => {
+      setMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "messages"] });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to send message",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSend = () => {
+    if (message.trim()) {
+      sendMutation.mutate(message.trim());
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-between gap-2"
+        onClick={() => setIsOpen(!isOpen)}
+        data-testid={`button-toggle-chat-${orderId}`}
+      >
+        <span className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4" />
+          Chat with Support
+        </span>
+        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </Button>
+
+      {isOpen && (
+        <div className="mt-3 space-y-3">
+          <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border bg-muted/30 p-3">
+            {isLoading ? (
+              <p className="text-center text-sm text-muted-foreground">Loading...</p>
+            ) : messages.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground">No messages yet. Start the conversation!</p>
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.senderType === "admin" ? "justify-start" : "justify-end"}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      msg.senderType === "admin"
+                        ? "bg-secondary text-secondary-foreground"
+                        : "bg-primary text-primary-foreground"
+                    }`}
+                  >
+                    {msg.senderType === "admin" && (
+                      <p className="mb-1 text-xs font-medium opacity-70">Support</p>
+                    )}
+                    <p>{msg.message}</p>
+                    <p className="mt-1 text-xs opacity-60">
+                      {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : ""}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="Type a message..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              data-testid={`input-chat-message-${orderId}`}
+            />
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!message.trim() || sendMutation.isPending}
+              data-testid={`button-send-message-${orderId}`}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AccountPage() {
+  const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
@@ -51,18 +176,20 @@ export default function AccountPage() {
     retry: false,
   });
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/logout", {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
-        title: "Please sign in",
-        description: "You need to sign in to view your account.",
-        variant: "destructive",
+        title: "Signed out",
+        description: "You have been signed out successfully.",
       });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-    }
-  }, [isAuthenticated, authLoading, toast]);
+      setLocation("/");
+    },
+  });
 
   if (authLoading) {
     return (
@@ -76,7 +203,25 @@ export default function AccountPage() {
   }
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="container mx-auto flex min-h-[60vh] items-center justify-center px-4">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6">
+            <User className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h2 className="mb-2 text-xl font-semibold">Sign in to view your account</h2>
+            <p className="mb-4 text-muted-foreground">
+              Create an account or sign in to track your orders
+            </p>
+            <Link href="/auth">
+              <Button className="gap-2" data-testid="button-goto-auth">
+                Sign Up / Sign In
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -111,13 +256,22 @@ export default function AccountPage() {
                 <p className="text-sm text-muted-foreground" data-testid="text-user-email">
                   {user?.email}
                 </p>
+                {user?.robloxUsername && (
+                  <p className="mt-1 text-sm text-muted-foreground" data-testid="text-roblox-username">
+                    Roblox: {user.robloxUsername}
+                  </p>
+                )}
                 <Separator className="my-4" />
-                <a href="/api/logout">
-                  <Button variant="outline" className="w-full gap-2" data-testid="button-logout">
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </a>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => logoutMutation.mutate()}
+                  disabled={logoutMutation.isPending}
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {logoutMutation.isPending ? "Signing Out..." : "Sign Out"}
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -161,7 +315,7 @@ export default function AccountPage() {
                       return (
                         <div
                           key={order.id}
-                          className="rounded-lg border p-4 hover-elevate"
+                          className="rounded-lg border p-4"
                           data-testid={`order-item-${order.id}`}
                         >
                           <div className="mb-3 flex items-start justify-between gap-4 flex-wrap">
@@ -181,6 +335,14 @@ export default function AccountPage() {
                             </Badge>
                           </div>
 
+                          <div className="mb-3">
+                            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                              <span>Order Progress</span>
+                              <span>{statusProgress[order.status] || 0}%</span>
+                            </div>
+                            <Progress value={statusProgress[order.status] || 0} className="h-2" />
+                          </div>
+
                           <div className="mb-3 text-sm text-muted-foreground">
                             {items.slice(0, 3).map((item, i) => (
                               <span key={i}>
@@ -195,7 +357,7 @@ export default function AccountPage() {
 
                           <div className="flex items-center justify-between gap-4 flex-wrap">
                             <span className="font-heading text-lg font-bold text-primary">
-                              {order.totalAmount} ج.م
+                              {order.totalAmount} EGP
                             </span>
                             <Link href={`/payment/${order.id}`}>
                               <Button size="sm" variant="outline" className="gap-1">
@@ -204,6 +366,8 @@ export default function AccountPage() {
                               </Button>
                             </Link>
                           </div>
+
+                          <OrderChat orderId={order.id} />
                         </div>
                       );
                     })}
