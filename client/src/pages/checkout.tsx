@@ -44,6 +44,9 @@ export default function CheckoutPage() {
   });
 
   const selectedPayment = form.watch("paymentMethod");
+  
+  const serviceTax = Math.round(totalPrice * 0.05);
+  const grandTotal = totalPrice + serviceTax;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -89,7 +92,7 @@ export default function CheckoutPage() {
       robloxUsername: data.robloxUsername,
       paymentMethod: data.paymentMethod,
       paymentReference: data.paymentReference || "",
-      totalAmount: totalPrice,
+      totalAmount: grandTotal,
       items: JSON.stringify(items.map(item => ({
         productId: item.productId,
         name: item.product.name,
@@ -343,6 +346,10 @@ export default function CheckoutPage() {
                   <span>{totalPrice} ج.م</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Service Tax (5%)</span>
+                  <span>{serviceTax} ج.م</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Delivery</span>
                   <span className="text-primary">Free</span>
                 </div>
@@ -355,7 +362,7 @@ export default function CheckoutPage() {
                     className="font-heading text-2xl font-bold text-primary"
                     data-testid="text-checkout-total"
                   >
-                    {totalPrice} <span className="text-base">ج.م</span>
+                    {grandTotal} <span className="text-base">ج.م</span>
                   </span>
                 </div>
               </CardContent>

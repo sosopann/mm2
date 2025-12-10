@@ -198,28 +198,15 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const user = await storage.getUser(req.session.userId);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const orders = await storage.getOrdersByUserId(req.session.userId);
       
-      const ordersByUserId = await storage.getOrdersByUserId(req.session.userId);
-      const ordersByEmail = await storage.getOrdersByEmail(user.email);
-      
-      const allOrders = [...ordersByUserId];
-      for (const order of ordersByEmail) {
-        if (!allOrders.find(o => o.id === order.id)) {
-          allOrders.push(order);
-        }
-      }
-      
-      allOrders.sort((a, b) => {
+      orders.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;
       });
       
-      res.json(allOrders);
+      res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ error: "Failed to fetch orders" });
