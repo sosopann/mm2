@@ -25,6 +25,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { checkoutFormSchema, type CheckoutFormData } from "@shared/schema";
 
+const MINIMUM_ORDER_AMOUNT = 100;
+
 export default function CheckoutPage() {
   const [, setLocation] = useLocation();
   const { items, totalPrice, clearCart } = useCart();
@@ -114,6 +116,24 @@ export default function CheckoutPage() {
           <Button className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Go to Shop
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (totalPrice < MINIMUM_ORDER_AMOUNT) {
+    return (
+      <div className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center">
+        <AlertCircle className="mb-4 h-16 w-16 text-destructive" />
+        <h1 className="mb-2 text-2xl font-bold">Minimum Order Not Met</h1>
+        <p className="mb-6 text-muted-foreground">
+          Minimum order amount is {MINIMUM_ORDER_AMOUNT} ج.م. Add {MINIMUM_ORDER_AMOUNT - totalPrice} ج.م more to proceed.
+        </p>
+        <Link href="/shop">
+          <Button className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Add More Items
           </Button>
         </Link>
       </div>

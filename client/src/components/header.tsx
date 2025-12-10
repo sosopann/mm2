@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { ShoppingCart, Search, Menu, X, Sword, User, LogIn } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { CATEGORIES } from "@shared/schema";
+import logoImg from "@assets/R_1765403937787.png";
 
 export function Header() {
   const [location] = useLocation();
@@ -21,13 +22,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-            <Sword className="h-6 w-6 text-primary-foreground" />
-            <div className="absolute -inset-0.5 -z-10 rounded-md bg-primary/30 blur-sm" />
-          </div>
-          <span className="font-heading text-xl font-bold tracking-wider text-foreground">
-            MM2<span className="text-primary">SHOP</span>
-          </span>
+          <img src={logoImg} alt="MM2 Club" className="h-12 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">

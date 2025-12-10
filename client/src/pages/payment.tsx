@@ -13,9 +13,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
 const PAYMENT_INFO = {
-  number: "01027996144",
-  name: "محمد أحمد",
+  vodafoneNumber: "01027996144",
   whatsapp: "01027996144",
+  instapay: "heba.ibrahim862246@instapay",
 };
 
 export default function PaymentPage() {
@@ -179,39 +179,75 @@ export default function PaymentPage() {
           <Card className="mb-6 border-primary/50 bg-primary/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                Vodafone Cash Payment
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">
+                  V
+                </div>
+                Vodafone Cash
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="rounded-lg bg-card p-4 text-center">
-                <p className="mb-2 text-sm text-muted-foreground">Transfer to:</p>
+                <p className="mb-2 text-sm text-muted-foreground">Transfer to this number:</p>
                 <div className="mb-2 flex items-center justify-center gap-2">
-                  <span className="font-mono text-2xl font-bold" data-testid="text-payment-number">
-                    {PAYMENT_INFO.number}
+                  <span className="font-mono text-2xl font-bold" data-testid="text-vodafone-number">
+                    {PAYMENT_INFO.vodafoneNumber}
                   </span>
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => copyToClipboard(PAYMENT_INFO.number, "Number")}
-                    data-testid="button-copy-number"
+                    onClick={() => copyToClipboard(PAYMENT_INFO.vodafoneNumber, "Vodafone Number")}
+                    data-testid="button-copy-vodafone"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-lg font-medium" data-testid="text-payment-name">
-                  {PAYMENT_INFO.name}
-                </p>
               </div>
+            </CardContent>
+          </Card>
 
-              <Separator />
+          <Card className="mb-6 border-blue-500/50 bg-blue-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                  I
+                </div>
+                InstaPay
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-card p-4 text-center">
+                <p className="mb-2 text-sm text-muted-foreground">InstaPay ID:</p>
+                <div className="mb-2 flex items-center justify-center gap-2 flex-wrap">
+                  <span className="font-mono text-lg font-bold break-all" data-testid="text-instapay">
+                    {PAYMENT_INFO.instapay}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => copyToClipboard(PAYMENT_INFO.instapay, "InstaPay")}
+                    data-testid="button-copy-instapay"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <div className="space-y-3 text-center">
-                <p className="text-sm text-muted-foreground">
-                  After payment, send the receipt screenshot on WhatsApp:
+          <Card className="mb-6 border-green-500/50 bg-green-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-green-600" />
+                بعد الدفع
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center space-y-3">
+                <p className="text-muted-foreground">
+                  بعد الدفع، أرسل صورة الإيصال على واتساب
                 </p>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-lg font-medium" data-testid="text-whatsapp">
+                  <span className="font-mono text-xl font-bold" data-testid="text-whatsapp">
                     {PAYMENT_INFO.whatsapp}
                   </span>
                   <Button
@@ -228,7 +264,7 @@ export default function PaymentPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Button className="mt-2 gap-2" data-testid="button-whatsapp-link">
+                  <Button className="mt-2 gap-2 bg-green-600 hover:bg-green-700" data-testid="button-whatsapp-link">
                     <MessageCircle className="h-4 w-4" />
                     Open WhatsApp
                   </Button>

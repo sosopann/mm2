@@ -1,9 +1,12 @@
 import { Link } from "wouter";
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useCart } from "@/lib/cart-context";
+
+const MINIMUM_ORDER_AMOUNT = 100;
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
@@ -170,10 +173,20 @@ export default function CartPage() {
                   </span>
                 </div>
 
+                {totalPrice < MINIMUM_ORDER_AMOUNT && (
+                  <Alert variant="destructive" data-testid="alert-minimum-order">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Minimum order amount is {MINIMUM_ORDER_AMOUNT} ج.م. Add {MINIMUM_ORDER_AMOUNT - totalPrice} ج.م more to proceed.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Link href="/checkout">
                   <Button
                     size="lg"
                     className="w-full gap-2 font-display uppercase tracking-wide"
+                    disabled={totalPrice < MINIMUM_ORDER_AMOUNT}
                     data-testid="button-checkout"
                   >
                     Proceed to Checkout

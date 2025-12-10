@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ShoppingCart, Eye } from "lucide-react";
+import { ShoppingCart, Eye, Sword, Zap, Crown, Sparkles, Flame, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,26 @@ import { useCart } from "@/lib/cart-context";
 import { rarityColors } from "@/lib/products";
 import type { Product } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+
+const rarityGradients: Record<string, string> = {
+  Common: "from-slate-500/20 to-slate-600/30",
+  Uncommon: "from-emerald-500/20 to-emerald-600/30",
+  Rare: "from-blue-500/20 to-blue-600/30",
+  Legendary: "from-purple-500/20 to-purple-600/30",
+  Godly: "from-amber-400/30 to-orange-500/40",
+  Ancient: "from-red-500/20 to-red-700/30",
+  Chroma: "from-pink-500/30 via-purple-500/30 to-cyan-500/30",
+};
+
+const rarityIcons: Record<string, typeof Sword> = {
+  Common: Sword,
+  Uncommon: Shield,
+  Rare: Zap,
+  Legendary: Crown,
+  Godly: Flame,
+  Ancient: Sparkles,
+  Chroma: Sparkles,
+};
 
 interface ProductCardProps {
   product: Product;
@@ -38,12 +58,13 @@ export function ProductCard({ product }: ProductCardProps) {
         
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden rounded-t-lg bg-muted/30">
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted">
-              <div className="text-center">
-                <div className="mb-2 text-4xl font-bold text-primary/20">
-                  {product.name.charAt(0)}
-                </div>
-                <p className="text-xs text-muted-foreground">MM2 Item</p>
+            <div className={`flex h-full items-center justify-center bg-gradient-to-br ${rarityGradients[product.rarity] || rarityGradients.Common}`}>
+              <div className="text-center px-2">
+                {(() => {
+                  const IconComponent = rarityIcons[product.rarity] || Sword;
+                  return <IconComponent className="mx-auto h-16 w-16 text-foreground/50" />;
+                })()}
+                <p className="mt-2 text-xs text-muted-foreground">{product.category}</p>
               </div>
             </div>
             
