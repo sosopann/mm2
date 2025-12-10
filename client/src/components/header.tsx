@@ -1,0 +1,197 @@
+import { Link, useLocation } from "wouter";
+import { ShoppingCart, Search, Menu, X, Sword } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useCart } from "@/lib/cart-context";
+import { useState } from "react";
+import { CATEGORIES } from "@shared/schema";
+
+const navLinks = [
+  { href: "/", label: "Home" },
+  { href: "/shop", label: "Shop" },
+  ...CATEGORIES.map((cat) => ({ href: `/shop?category=${cat}`, label: cat })),
+  { href: "/contact", label: "Contact" },
+];
+
+export function Header() {
+  const [location] = useLocation();
+  const { totalItems } = useCart();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-md bg-primary">
+            <Sword className="h-6 w-6 text-primary-foreground" />
+            <div className="absolute -inset-0.5 -z-10 rounded-md bg-primary/30 blur-sm" />
+          </div>
+          <span className="font-heading text-xl font-bold tracking-wider text-foreground">
+            MM2<span className="text-primary">SHOP</span>
+          </span>
+        </Link>
+
+        <nav className="hidden items-center gap-1 lg:flex">
+          <Link href="/">
+            <Button
+              variant={location === "/" ? "secondary" : "ghost"}
+              size="sm"
+              data-testid="link-home"
+            >
+              Home
+            </Button>
+          </Link>
+          <Link href="/shop">
+            <Button
+              variant={location === "/shop" ? "secondary" : "ghost"}
+              size="sm"
+              data-testid="link-shop"
+            >
+              Shop
+            </Button>
+          </Link>
+          <Link href="/contact">
+            <Button
+              variant={location === "/contact" ? "secondary" : "ghost"}
+              size="sm"
+              data-testid="link-contact"
+            >
+              Contact
+            </Button>
+          </Link>
+        </nav>
+
+        <div className="flex items-center gap-2">
+          {searchOpen ? (
+            <div className="relative hidden md:block">
+              <Input
+                type="search"
+                placeholder="Search items..."
+                className="w-48 pr-8 lg:w-64"
+                autoFocus
+                onBlur={() => setSearchOpen(false)}
+                data-testid="input-search"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="absolute right-0 top-0"
+                onClick={() => setSearchOpen(false)}
+                data-testid="button-close-search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="hidden md:flex"
+              onClick={() => setSearchOpen(true)}
+              data-testid="button-open-search"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
+          )}
+
+          <Link href="/cart">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="relative"
+              data-testid="button-cart"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {totalItems > 0 && (
+                <Badge
+                  variant="default"
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center p-0 text-xs"
+                  data-testid="badge-cart-count"
+                >
+                  {totalItems}
+                </Badge>
+              )}
+            </Button>
+          </Link>
+
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="lg:hidden"
+                data-testid="button-mobile-menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72">
+              <div className="flex flex-col gap-4 pt-8">
+                <Input
+                  type="search"
+                  placeholder="Search items..."
+                  className="w-full"
+                  data-testid="input-mobile-search"
+                />
+                <nav className="flex flex-col gap-2">
+                  <Link href="/" onClick={() => setMobileMenuOpen(false)}>
+                    <Button
+                      variant={location === "/" ? "secondary" : "ghost"}
+                      className="w-full justify-start"
+                      data-testid="mobile-link-home"
+                    >
+                      Home
+                    </Button>
+                  </Link>
+                  <Link href="/shop" onClick={() => setMobileMenuOpen(false)}>
+                    <Button
+                      variant={location === "/shop" ? "secondary" : "ghost"}
+                      className="w-full justify-start"
+                      data-testid="mobile-link-shop"
+                    >
+                      All Items
+                    </Button>
+                  </Link>
+                  <div className="border-t border-border pt-2">
+                    <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Categories
+                    </p>
+                    {CATEGORIES.map((cat) => (
+                      <Link
+                        key={cat}
+                        href={`/shop?category=${cat}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          data-testid={`mobile-link-category-${cat.toLowerCase()}`}
+                        >
+                          {cat}
+                        </Button>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="border-t border-border pt-2">
+                    <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
+                      <Button
+                        variant={location === "/contact" ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                        data-testid="mobile-link-contact"
+                      >
+                        Contact
+                      </Button>
+                    </Link>
+                  </div>
+                </nav>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </header>
+  );
+}
