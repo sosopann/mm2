@@ -1,0 +1,58 @@
+I want to build a complete WordPress e-commerce website for selling digital items from the Roblox game "Murder Mystery 2 (MM2)", including Knives, Guns, Bundles, and Special Packages. These are digital in‑game items, NOT real weapons.
+
+Here is what I need you to generate for me:
+
+1. Create a full website structure for an online MM2 shop:
+   - Homepage
+   - Shop page
+   - Product categories: Knives, Guns, Godlys, Ancient Items, Bundles, Packages
+   - Product pages with images, pricing, and descriptions
+   - Cart + Checkout pages
+   - Contact page
+
+2. I want the design to look like a gaming store:
+   - dark theme
+   - neon highlights (blue/red)
+   - MM2 style banners
+   - Roblox-inspired graphics
+
+3. Generate example product names, descriptions, and images I can upload, for at least:
+   - 10 Knives
+   - 10 Guns
+   - 5 Godlys
+   - 3 Bundles
+   - 3 Packages
+
+4. Give me step‑by‑step instructions on how to:
+   - Add these products into WooCommerce
+   - Add categories
+   - Replace all template demo images with my own MM2 images
+   - Set up the homepage using Elementor
+
+5. Payment method setup:
+   - Only manual payments for Egypt (no cards):
+      • Vodafone Cash
+      • InstaPay
+   - Show me how to edit WooCommerce → Payments to rename “Bank Transfer” into these methods and add instructions for the customer.
+
+6. Plugins I already have installed:
+   - WooCommerce
+   - Elementor
+   - Starter Templates
+   - CartFlows
+   - Variation Swatches for WooCommerce
+   - WPForms Lite
+   - SureRank SEO
+   - Ultimate Addons for Elementor Lite
+
+   Explain how to use these plugins to:
+   - Build the pages
+   - Create good product layouts
+   - Improve checkout flow
+   - Improve SEO of the store
+
+7. Remove any plugins that I don’t need (like Hello Dolly).
+
+8. Finally, write the full step‑by‑step setup instructions in the most clear and simple way possible, with the exact WordPress menus and buttons to click.
+
+The final output should be a complete, actionable guide to build an MM2 item shop from zero to fully working.
