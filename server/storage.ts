@@ -2,6 +2,7 @@ import {
   users,
   orders,
   chatMessages,
+  products,
   type User, 
   type UpsertUser,
   type InsertUser,
@@ -15,7 +16,7 @@ import {
   type InsertChatMessage
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -25,6 +26,11 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   
+  getAllProducts(): Promise<Product[]>;
+  getProductById(id: string): Promise<Product | undefined>;
+  updateProduct(id: string, updates: Partial<Product>): Promise<Product | undefined>;
+  createProduct(product: Product): Promise<Product>;
+  
   createOrder(order: InsertOrder): Promise<Order>;
   getOrderById(id: string): Promise<Order | undefined>;
   getOrdersByUserId(userId: string): Promise<Order[]>;
@@ -32,10 +38,12 @@ export interface IStorage {
   getAllOrders(): Promise<Order[]>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   updateOrderReceipt(id: string, receiptUrl: string): Promise<Order | undefined>;
+  deleteOrdersByStatus(statuses: string[]): Promise<number>;
   
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessagesByOrderId(orderId: string): Promise<ChatMessage[]>;
   getAllChats(): Promise<{ orderId: string; messages: ChatMessage[]; order: Order | undefined }[]>;
+  deleteChatsByOrderIds(orderIds: string[]): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -164,6 +172,51 @@ export class DatabaseStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async getProductById(id: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async updateProduct(id: string, updates: Partial<Product>): Promise<Product | undefined> {
+    const [product] = await db
+      .update(products)
+      .set(updates)
+      .where(eq(products.id, id))
+      .returning();
+    return product;
+  }
+
+  async createProduct(product: Product): Promise<Product> {
+    const [created] = await db
+      .insert(products)
+      .values(product)
+      .onConflictDoNothing()
+      .returning();
+    return created || product;
+  }
+
+  async deleteOrdersByStatus(statuses: string[]): Promise<number> {
+    if (statuses.length === 0) return 0;
+    const deletedOrders = await db
+      .delete(orders)
+      .where(inArray(orders.status, statuses))
+      .returning();
+    return deletedOrders.length;
+  }
+
+  async deleteChatsByOrderIds(orderIds: string[]): Promise<number> {
+    if (orderIds.length === 0) return 0;
+    const deletedChats = await db
+      .delete(chatMessages)
+      .where(inArray(chatMessages.orderId, orderIds))
+      .returning();
+    return deletedChats.length;
   }
 }
 

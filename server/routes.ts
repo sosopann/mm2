@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { registerFormSchema, loginFormSchema, insertOrderSchema } from "@shared/schema";
+import { registerFormSchema, loginFormSchema, insertOrderSchema, type Product } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -368,6 +368,119 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Admin chat error:", error);
       res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/products", async (req, res) => {
+    try {
+      const products = await storage.getAllProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const product = await storage.getProductById(id);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  app.get("/api/admin/products", requireAdmin, async (req, res) => {
+    try {
+      const products = await storage.getAllProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { price, inStock } = req.body;
+      
+      const updates: Partial<Product> = {};
+      if (price !== undefined) {
+        const priceNum = Number(price);
+        if (isNaN(priceNum) || priceNum < 0) {
+          return res.status(400).json({ error: "Invalid price value" });
+        }
+        updates.price = priceNum;
+      }
+      if (inStock !== undefined) {
+        const stockNum = Number(inStock);
+        if (isNaN(stockNum) || stockNum < 0 || !Number.isInteger(stockNum)) {
+          return res.status(400).json({ error: "Invalid stock value" });
+        }
+        updates.inStock = stockNum;
+      }
+      
+      const product = await storage.updateProduct(id, updates);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.post("/api/admin/products/seed", requireAdmin, async (req, res) => {
+    try {
+      const { products } = req.body;
+      if (!Array.isArray(products)) {
+        return res.status(400).json({ error: "Products array required" });
+      }
+      
+      let created = 0;
+      for (const product of products) {
+        await storage.createProduct(product);
+        created++;
+      }
+      
+      res.json({ success: true, count: created });
+    } catch (error) {
+      console.error("Error seeding products:", error);
+      res.status(500).json({ error: "Failed to seed products" });
+    }
+  });
+
+  app.post("/api/admin/cleanup", requireAdmin, async (req, res) => {
+    try {
+      const { type } = req.body;
+      const statuses = type === "completed" 
+        ? ["completed"] 
+        : type === "cancelled" 
+          ? ["cancelled"] 
+          : ["completed", "cancelled"];
+      
+      const ordersToDelete = (await storage.getAllOrders()).filter(o => statuses.includes(o.status));
+      const orderIds = ordersToDelete.map(o => o.id);
+      
+      const deletedChats = await storage.deleteChatsByOrderIds(orderIds);
+      const deletedOrders = await storage.deleteOrdersByStatus(statuses);
+      
+      res.json({ 
+        success: true, 
+        deletedOrders, 
+        deletedChats,
+        message: `Deleted ${deletedOrders} orders and ${deletedChats} chat messages`
+      });
+    } catch (error) {
+      console.error("Error cleaning up:", error);
+      res.status(500).json({ error: "Failed to cleanup" });
     }
   });
 
