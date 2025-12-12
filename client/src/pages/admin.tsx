@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Lock, Package, Eye, CheckCircle, Clock, RefreshCw, MessageCircle, Send, User, Shield, Trash2, Edit2, ShoppingBag, Plus, Search, X } from "lucide-react";
+import { Lock, Package, Eye, CheckCircle, Clock, RefreshCw, MessageCircle, Send, User, Shield, Trash2, Edit2, ShoppingBag, Plus, Search, X, Upload, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +97,7 @@ export default function AdminPage() {
     imageUrl: "",
     inStock: "1",
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
 
   const loginMutation = useMutation({
@@ -321,6 +322,39 @@ export default function AdminPage() {
       return;
     }
     createProductMutation.mutate(newProduct);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/admin/upload-product-image', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload failed');
+      }
+      
+      const { imageUrl } = await response.json();
+      setNewProduct(prev => ({ ...prev, imageUrl }));
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload image";
+      toast({ title: message, variant: "destructive" });
+    } finally {
+      setUploadingImage(false);
+      const input = document.getElementById('product-image-upload') as HTMLInputElement;
+      if (input) input.value = '';
+    }
   };
 
   const getOrderItems = (order: Order): OrderItem[] => {
@@ -1165,27 +1199,68 @@ export default function AdminPage() {
                   data-testid="input-new-product-description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-image">Image URL</Label>
-                  <Input
-                    id="new-image"
-                    value={newProduct.imageUrl}
-                    onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
-                    placeholder="/products/..."
-                    data-testid="input-new-product-image"
+              <div className="space-y-2">
+                <Label>Product Image</Label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="product-image-upload"
+                    data-testid="input-product-image-file"
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('product-image-upload')?.click()}
+                    disabled={uploadingImage}
+                    className="gap-2"
+                    data-testid="button-upload-image"
+                  >
+                    {uploadingImage ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {uploadingImage ? "Uploading..." : "Upload Image"}
+                  </Button>
+                  {newProduct.imageUrl && (
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src={newProduct.imageUrl} 
+                        alt="Preview" 
+                        className="h-10 w-10 rounded-md object-cover border"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setNewProduct({...newProduct, imageUrl: ""})}
+                        data-testid="button-clear-image"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-stock">Stock</Label>
-                  <Input
-                    id="new-stock"
-                    type="number"
-                    value={newProduct.inStock}
-                    onChange={(e) => setNewProduct({...newProduct, inStock: e.target.value})}
-                    data-testid="input-new-product-stock"
-                  />
-                </div>
+                <Input
+                  placeholder="Or paste image URL..."
+                  value={newProduct.imageUrl}
+                  onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                  className="mt-2"
+                  data-testid="input-new-product-image"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-stock">Stock</Label>
+                <Input
+                  id="new-stock"
+                  type="number"
+                  value={newProduct.inStock}
+                  onChange={(e) => setNewProduct({...newProduct, inStock: e.target.value})}
+                  data-testid="input-new-product-stock"
+                />
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setShowAddProduct(false)}>

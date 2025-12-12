@@ -457,6 +457,19 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/upload-product-image", requireAdmin, upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No image file provided" });
+      }
+      const imageUrl = `/uploads/${req.file.filename}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error("Error uploading product image:", error);
+      res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
   app.post("/api/admin/products", requireAdmin, async (req, res) => {
     try {
       const { name, price, category, rarity, description, imageUrl, inStock } = req.body;
