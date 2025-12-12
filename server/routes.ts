@@ -241,13 +241,7 @@ export async function registerRoutes(
       }
       
       const isAdmin = req.session.isAdmin === true;
-      const isOwner = req.session.userId && (
-        order.userId === req.session.userId ||
-        (async () => {
-          const user = await storage.getUser(req.session.userId!);
-          return user?.email === order.email;
-        })()
-      );
+      const isOwner = req.session.userId && order.userId === req.session.userId;
       
       const messages = await storage.getChatMessagesByOrderId(id);
       res.json(messages);
