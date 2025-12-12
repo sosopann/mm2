@@ -15,6 +15,7 @@ import {
   type ChatMessage,
   type InsertChatMessage
 } from "@shared/schema";
+import { seedProducts } from "@shared/seedProducts";
 import { db } from "./db";
 import { eq, desc, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -35,7 +36,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   getOrderById(id: string): Promise<Order | undefined>;
   getOrdersByUserId(userId: string): Promise<Order[]>;
-  getOrdersByEmail(email: string): Promise<Order[]>;
+  getOrdersByPhone(phone: string): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   updateOrderReceipt(id: string, receiptUrl: string): Promise<Order | undefined>;
@@ -45,6 +46,7 @@ export interface IStorage {
   getChatMessagesByOrderId(orderId: string): Promise<ChatMessage[]>;
   getAllChats(): Promise<{ orderId: string; messages: ChatMessage[]; order: Order | undefined }[]>;
   deleteChatsByOrderIds(orderIds: string[]): Promise<number>;
+  seedProductsIfEmpty(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -103,11 +105,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(orders.createdAt));
   }
 
-  async getOrdersByEmail(email: string): Promise<Order[]> {
+  async getOrdersByPhone(phone: string): Promise<Order[]> {
     return await db
       .select()
       .from(orders)
-      .where(eq(orders.email, email))
+      .where(eq(orders.phone, phone))
       .orderBy(desc(orders.createdAt));
   }
 
@@ -163,7 +165,7 @@ export class DatabaseStorage implements IStorage {
       .from(chatMessages)
       .orderBy(desc(chatMessages.createdAt));
     
-    const orderIds = [...new Set(allMessages.map(m => m.orderId))];
+    const orderIds = Array.from(new Set(allMessages.map(m => m.orderId)));
     const result = [];
     
     for (const orderId of orderIds) {
@@ -226,6 +228,17 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(chatMessages.orderId, orderIds))
       .returning();
     return deletedChats.length;
+  }
+
+  async seedProductsIfEmpty(): Promise<void> {
+    const existingProducts = await db.select().from(products).limit(1);
+    if (existingProducts.length === 0) {
+      console.log("Seeding products database with initial data...");
+      for (const product of seedProducts) {
+        await db.insert(products).values(product).onConflictDoNothing();
+      }
+      console.log(`Seeded ${seedProducts.length} products successfully.`);
+    }
   }
 }
 

@@ -84,6 +84,9 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editStock, setEditStock] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [uploadingEditImage, setUploadingEditImage] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
@@ -95,7 +98,7 @@ export default function AdminPage() {
     rarity: "Common",
     description: "",
     imageUrl: "",
-    inStock: "1",
+    inStock: "100",
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
@@ -173,8 +176,8 @@ export default function AdminPage() {
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, price, inStock }: { id: string; price: number; inStock: number }) => {
-      const response = await apiRequest("PATCH", `/api/admin/products/${id}`, { price, inStock });
+    mutationFn: async ({ id, price, inStock, description, imageUrl }: { id: string; price: number; inStock: number; description?: string; imageUrl?: string | null }) => {
+      const response = await apiRequest("PATCH", `/api/admin/products/${id}`, { price, inStock, description, imageUrl });
       if (!response.ok) throw new Error("Failed to update product");
       return response.json();
     },
@@ -218,7 +221,7 @@ export default function AdminPage() {
         rarity: "Common",
         description: "",
         imageUrl: "",
-        inStock: "1",
+        inStock: "100",
       });
     },
     onError: () => {
@@ -304,6 +307,8 @@ export default function AdminPage() {
     setEditingProduct(product);
     setEditPrice(String(product.price));
     setEditStock(String(product.inStock ?? 0));
+    setEditDescription(product.description || "");
+    setEditImageUrl(product.imageUrl || "");
   };
 
   const handleSaveProduct = () => {
@@ -312,7 +317,42 @@ export default function AdminPage() {
         id: editingProduct.id,
         price: Number(editPrice),
         inStock: Number(editStock),
+        description: editDescription,
+        imageUrl: editImageUrl || null,
       });
+    }
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingEditImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/admin/upload-product-image', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload failed');
+      }
+      
+      const { imageUrl } = await response.json();
+      setEditImageUrl(imageUrl);
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload image";
+      toast({ title: message, variant: "destructive" });
+    } finally {
+      setUploadingEditImage(false);
+      const input = document.getElementById('edit-image-upload') as HTMLInputElement;
+      if (input) input.value = '';
     }
   };
 
@@ -1086,34 +1126,92 @@ export default function AdminPage() {
         </Dialog>
 
         <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Product</DialogTitle>
               <DialogDescription>
-                Update price and stock for {editingProduct?.name}
+                Update {editingProduct?.name}
               </DialogDescription>
             </DialogHeader>
             {editingProduct && (
               <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-price">Price (EGP)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      data-testid="input-edit-price"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-stock">Stock</Label>
+                    <Input
+                      id="edit-stock"
+                      type="number"
+                      value={editStock}
+                      onChange={(e) => setEditStock(e.target.value)}
+                      data-testid="input-edit-stock"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-price">Price (EGP)</Label>
-                  <Input
-                    id="edit-price"
-                    type="number"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    data-testid="input-edit-price"
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    data-testid="input-edit-description"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-stock">Stock</Label>
-                  <Input
-                    id="edit-stock"
-                    type="number"
-                    value={editStock}
-                    onChange={(e) => setEditStock(e.target.value)}
-                    data-testid="input-edit-stock"
-                  />
+                  <Label>Product Image</Label>
+                  <div className="flex items-center gap-3">
+                    {editImageUrl && (
+                      <div className="relative">
+                        <img
+                          src={editImageUrl}
+                          alt="Product"
+                          className="w-16 h-16 object-cover rounded-md border"
+                        />
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5"
+                          onClick={() => setEditImageUrl("")}
+                          data-testid="button-remove-edit-image"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImageUpload}
+                        className="hidden"
+                        id="edit-image-upload"
+                        data-testid="input-edit-image-upload"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById('edit-image-upload')?.click()}
+                        disabled={uploadingEditImage}
+                      >
+                        {uploadingEditImage ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {uploadingEditImage ? "Uploading..." : "Upload Image"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => setEditingProduct(null)}>

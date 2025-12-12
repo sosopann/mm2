@@ -50,6 +50,8 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  await storage.seedProductsIfEmpty();
+  
   app.use(session({
     secret: process.env.SESSION_SECRET || 'mm2-shop-secret-key-2024',
     resave: false,
@@ -402,7 +404,7 @@ export async function registerRoutes(
   app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { price, inStock } = req.body;
+      const { price, inStock, description, imageUrl } = req.body;
       
       const updates: Partial<Product> = {};
       if (price !== undefined) {
@@ -418,6 +420,12 @@ export async function registerRoutes(
           return res.status(400).json({ error: "Invalid stock value" });
         }
         updates.inStock = stockNum;
+      }
+      if (description !== undefined) {
+        updates.description = description || null;
+      }
+      if (imageUrl !== undefined) {
+        updates.imageUrl = imageUrl || null;
       }
       
       const product = await storage.updateProduct(id, updates);
