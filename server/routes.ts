@@ -457,6 +457,68 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/products", requireAdmin, async (req, res) => {
+    try {
+      const { name, price, category, rarity, description, imageUrl, inStock } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Name is required and must be a non-empty string" });
+      }
+      
+      const parsedPrice = Number(price);
+      if (isNaN(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ error: "Price must be a valid positive number" });
+      }
+      
+      const validCategories = ["Budget", "Standard", "Godly", "Ancient", "Bundles", "Royal"];
+      if (!category || !validCategories.includes(category)) {
+        return res.status(400).json({ error: "Category must be one of: " + validCategories.join(", ") });
+      }
+      
+      const validRarities = ["Common", "Uncommon", "Rare", "Legendary", "Godly", "Ancient", "Chroma"];
+      if (!rarity || !validRarities.includes(rarity)) {
+        return res.status(400).json({ error: "Rarity must be one of: " + validRarities.join(", ") });
+      }
+      
+      const parsedStock = inStock !== undefined ? Number(inStock) : 1;
+      if (isNaN(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ error: "Stock must be a valid non-negative number" });
+      }
+      
+      const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      
+      const product = await storage.createProduct({
+        id,
+        name: name.trim(),
+        price: parsedPrice,
+        category,
+        rarity,
+        description: description?.trim() || null,
+        imageUrl: imageUrl?.trim() || null,
+        inStock: parsedStock,
+      });
+      
+      res.json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(500).json({ error: "Failed to create product" });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteProduct(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
   app.post("/api/admin/cleanup", requireAdmin, async (req, res) => {
     try {
       const { type } = req.body;

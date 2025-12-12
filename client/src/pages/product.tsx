@@ -1,20 +1,44 @@
 import { useParams, Link } from "wouter";
-import { ArrowLeft, ShoppingCart, Zap, Shield, Clock, Package } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Zap, Shield, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ProductCard } from "@/components/product-card";
 import { useCart } from "@/lib/cart-context";
-import { getProductById, allProducts, rarityColors } from "@/lib/products";
+import { useProduct, useProducts } from "@/hooks/use-products";
+import { rarityColors } from "@/lib/products";
 import { useToast } from "@/hooks/use-toast";
+import { useMemo } from "react";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const { addItem } = useCart();
   const { toast } = useToast();
 
-  const product = getProductById(id || "");
+  const { data: product, isLoading } = useProduct(id || "");
+  const { data: allProducts = [] } = useProducts();
+
+  const relatedProducts = useMemo(() => {
+    if (!product) return [];
+    return allProducts
+      .filter(
+        (p) =>
+          p.id !== product.id &&
+          (p.category === product.category || p.rarity === product.rarity)
+      )
+      .slice(0, 4);
+  }, [product, allProducts]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading product...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -41,14 +65,6 @@ export default function ProductPage() {
       description: `${product.name} has been added to your cart.`,
     });
   };
-
-  const relatedProducts = allProducts
-    .filter(
-      (p) =>
-        p.id !== product.id &&
-        (p.category === product.category || p.rarity === product.rarity)
-    )
-    .slice(0, 4);
 
   const rarityClass = rarityColors[product.rarity] || rarityColors.Common;
 
@@ -105,6 +121,9 @@ export default function ProductPage() {
             <div className="mb-2 flex items-center gap-2">
               <Badge variant="outline">{product.category}</Badge>
               <Badge className={rarityClass}>{product.rarity}</Badge>
+              {product.inStock === 0 && (
+                <Badge variant="destructive">Out of Stock</Badge>
+              )}
             </div>
 
             <h1
@@ -124,7 +143,7 @@ export default function ProductPage() {
                 data-testid="text-product-price"
               >
                 {product.price}{" "}
-                <span className="text-2xl text-muted-foreground">ج.م</span>
+                <span className="text-2xl text-muted-foreground">EGP</span>
               </span>
             </div>
 
@@ -133,10 +152,11 @@ export default function ProductPage() {
                 size="lg"
                 className="flex-1 gap-2 font-display uppercase tracking-wide"
                 onClick={handleAddToCart}
+                disabled={product.inStock === 0}
                 data-testid="button-add-to-cart"
               >
                 <ShoppingCart className="h-5 w-5" />
-                Add to Cart
+                {product.inStock === 0 ? "Out of Stock" : "Add to Cart"}
               </Button>
               <Link href="/cart" className="flex-1">
                 <Button
@@ -144,6 +164,7 @@ export default function ProductPage() {
                   variant="secondary"
                   className="w-full gap-2 font-display uppercase tracking-wide"
                   onClick={handleAddToCart}
+                  disabled={product.inStock === 0}
                   data-testid="button-buy-now"
                 >
                   Buy Now

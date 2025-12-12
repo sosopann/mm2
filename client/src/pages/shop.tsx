@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useLocation, useSearch } from "wouter";
-import { Search, SlidersHorizontal, X, ChevronDown } from "lucide-react";
+import { useSearch } from "wouter";
+import { Search, SlidersHorizontal, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ProductCard } from "@/components/product-card";
-import { allProducts, categoryInfo } from "@/lib/products";
+import { useProducts } from "@/hooks/use-products";
 import { CATEGORIES, RARITIES, type Category, type Rarity } from "@shared/schema";
 
 type SortOption = "name-asc" | "name-desc" | "price-asc" | "price-desc";
@@ -32,6 +32,8 @@ export default function ShopPage() {
   const params = new URLSearchParams(search);
   const initialCategory = params.get("category") as Category | null;
 
+  const { data: products = [], isLoading } = useProducts();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<Category[]>(
     initialCategory ? [initialCategory] : []
@@ -40,8 +42,25 @@ export default function ShopPage() {
   const [sortBy, setSortBy] = useState<SortOption>("name-asc");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 6000]);
 
+  const categoryInfo = useMemo(() => {
+    const info: Record<string, { description: string; itemCount: number }> = {
+      Budget: { description: "Affordable items for beginners", itemCount: 0 },
+      Standard: { description: "Popular items with great value", itemCount: 0 },
+      Godly: { description: "Rare and powerful godly items", itemCount: 0 },
+      Ancient: { description: "Legendary ancient artifacts", itemCount: 0 },
+      Bundles: { description: "Value bundles and sets", itemCount: 0 },
+      Royal: { description: "Premium exclusive collections", itemCount: 0 },
+    };
+    products.forEach((p) => {
+      if (info[p.category]) {
+        info[p.category].itemCount++;
+      }
+    });
+    return info;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    let filtered = allProducts;
+    let filtered = [...products];
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -84,7 +103,7 @@ export default function ShopPage() {
     }
 
     return filtered;
-  }, [searchQuery, selectedCategories, selectedRarities, sortBy, priceRange]);
+  }, [products, searchQuery, selectedCategories, selectedRarities, sortBy, priceRange]);
 
   const toggleCategory = (category: Category) => {
     setSelectedCategories((prev) =>
@@ -135,7 +154,7 @@ export default function ShopPage() {
               >
                 <span>{category}</span>
                 <span className="text-muted-foreground">
-                  ({categoryInfo[category].itemCount})
+                  ({categoryInfo[category]?.itemCount || 0})
                 </span>
               </Label>
             </div>
@@ -189,7 +208,7 @@ export default function ShopPage() {
             className="w-24"
             data-testid="input-price-max"
           />
-          <span className="text-sm text-muted-foreground">ج.م</span>
+          <span className="text-sm text-muted-foreground">EGP</span>
         </div>
       </div>
 
@@ -206,6 +225,17 @@ export default function ShopPage() {
       )}
     </div>
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">
@@ -305,7 +335,7 @@ export default function ShopPage() {
                 className="cursor-pointer gap-1"
                 onClick={() => setPriceRange([0, 6000])}
               >
-                {priceRange[0]}-{priceRange[1]} ج.م
+                {priceRange[0]}-{priceRange[1]} EGP
                 <X className="h-3 w-3" />
               </Badge>
             )}

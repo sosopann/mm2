@@ -1,11 +1,12 @@
 import { Link } from "wouter";
-import { Zap, Shield, Clock, ArrowRight, Sword, Target, Package, Crown } from "lucide-react";
+import { Zap, Shield, Clock, ArrowRight, Sword, Target, Package, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/product-card";
-import { getTopSellingProducts, getFeaturedProducts, categoryInfo } from "@/lib/products";
+import { useProducts } from "@/hooks/use-products";
 import { CATEGORIES } from "@shared/schema";
+import { useMemo } from "react";
 
 const categoryIcons: Record<string, typeof Sword> = {
   Budget: Package,
@@ -17,8 +18,32 @@ const categoryIcons: Record<string, typeof Sword> = {
 };
 
 export default function HomePage() {
-  const topSelling = getTopSellingProducts();
-  const featured = getFeaturedProducts();
+  const { data: products = [], isLoading } = useProducts();
+
+  const categoryInfo = useMemo(() => {
+    const info: Record<string, { description: string; itemCount: number }> = {
+      Budget: { description: "Affordable items for beginners", itemCount: 0 },
+      Standard: { description: "Popular items with great value", itemCount: 0 },
+      Godly: { description: "Rare and powerful godly items", itemCount: 0 },
+      Ancient: { description: "Legendary ancient artifacts", itemCount: 0 },
+      Bundles: { description: "Value bundles and sets", itemCount: 0 },
+      Royal: { description: "Premium exclusive collections", itemCount: 0 },
+    };
+    products.forEach((p) => {
+      if (info[p.category]) {
+        info[p.category].itemCount++;
+      }
+    });
+    return info;
+  }, [products]);
+
+  const topSelling = useMemo(() => {
+    return products.filter(p => p.rarity === "Godly" || p.rarity === "Ancient").slice(0, 8);
+  }, [products]);
+
+  const featured = useMemo(() => {
+    return products.filter(p => p.category === "Bundles" || p.category === "Royal").slice(0, 6);
+  }, [products]);
 
   return (
     <div className="min-h-screen">
@@ -30,7 +55,7 @@ export default function HomePage() {
           <div className="mx-auto max-w-4xl text-center">
             <Badge className="mb-6 px-4 py-1.5" variant="secondary">
               <Zap className="mr-1 h-3 w-3" />
-              Instant Delivery • Egyptian Payments
+              Instant Delivery - Egyptian Payments
             </Badge>
             
             <h1 className="mb-6 font-heading text-4xl font-bold uppercase tracking-wider md:text-5xl lg:text-6xl">
@@ -63,7 +88,7 @@ export default function HomePage() {
 
           <div className="mt-16 grid grid-cols-2 gap-4 text-center md:grid-cols-4">
             {[
-              { icon: Package, label: "150+ Items", desc: "Huge Collection" },
+              { icon: Package, label: `${products.length}+ Items`, desc: "Huge Collection" },
               { icon: Zap, label: "Instant Delivery", desc: "5-30 Minutes" },
               { icon: Shield, label: "Secure", desc: "Safe Transactions" },
               { icon: Clock, label: "24/7", desc: "Always Available" },
@@ -137,11 +162,17 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {topSelling.slice(0, 8).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {topSelling.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -156,11 +187,17 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featured.slice(0, 6).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {featured.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -209,7 +246,7 @@ export default function HomePage() {
             Ready to Upgrade Your Inventory?
           </h2>
           <p className="mb-8 text-muted-foreground">
-            Browse our collection of 150+ premium MM2 items
+            Browse our collection of {products.length}+ premium MM2 items
           </p>
           <Link href="/shop">
             <Button size="lg" className="gap-2 font-display uppercase tracking-wide" data-testid="button-start-shopping">

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Lock, Package, Eye, CheckCircle, Clock, RefreshCw, MessageCircle, Send, User, Shield, Trash2, Edit2, ShoppingBag } from "lucide-react";
+import { Lock, Package, Eye, CheckCircle, Clock, RefreshCw, MessageCircle, Send, User, Shield, Trash2, Edit2, ShoppingBag, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Order, ChatMessage, Product } from "@shared/schema";
+import { CATEGORIES, RARITIES } from "@shared/schema";
 import { allProducts } from "@/lib/products";
 
 const ORDER_STATUSES = [
@@ -65,6 +67,14 @@ interface ChatData {
   order: Order | undefined;
 }
 
+interface OrderItem {
+  id?: string;
+  name: string;
+  quantity: number;
+  price?: number;
+  imageUrl?: string;
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -74,6 +84,19 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editStock, setEditStock] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    price: "",
+    category: "Budget",
+    rarity: "Common",
+    description: "",
+    imageUrl: "",
+    inStock: "1",
+  });
   const { toast } = useToast();
 
   const loginMutation = useMutation({
@@ -157,11 +180,68 @@ export default function AdminPage() {
     onSuccess: () => {
       toast({ title: "Product updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setEditingProduct(null);
     },
     onError: () => {
       toast({
         title: "Update failed",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createProductMutation = useMutation({
+    mutationFn: async (product: typeof newProduct) => {
+      const response = await apiRequest("POST", "/api/admin/products", {
+        name: product.name,
+        price: Number(product.price),
+        category: product.category,
+        rarity: product.rarity,
+        description: product.description || null,
+        imageUrl: product.imageUrl || null,
+        inStock: Number(product.inStock),
+      });
+      if (!response.ok) throw new Error("Failed to create product");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Product created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setShowAddProduct(false);
+      setNewProduct({
+        name: "",
+        price: "",
+        category: "Budget",
+        rarity: "Common",
+        description: "",
+        imageUrl: "",
+        inStock: "1",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to create product",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/products/${id}`);
+      if (!response.ok) throw new Error("Failed to delete product");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Product deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to delete product",
         variant: "destructive",
       });
     },
@@ -176,6 +256,7 @@ export default function AdminPage() {
     onSuccess: (data) => {
       toast({ title: `Seeded ${data.count} products` });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: () => {
       toast({
@@ -233,6 +314,59 @@ export default function AdminPage() {
       });
     }
   };
+
+  const handleCreateProduct = () => {
+    if (!newProduct.name || !newProduct.price) {
+      toast({ title: "Name and price are required", variant: "destructive" });
+      return;
+    }
+    createProductMutation.mutate(newProduct);
+  };
+
+  const getOrderItems = (order: Order): OrderItem[] => {
+    try {
+      const items = JSON.parse(order.items);
+      return items.map((item: any) => {
+        const product = products.find(p => p.id === item.id || p.name === item.name);
+        return {
+          ...item,
+          price: product?.price || item.price,
+          imageUrl: product?.imageUrl || item.imageUrl,
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return products;
+    const query = productSearch.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.category.toLowerCase().includes(query) ||
+      p.rarity.toLowerCase().includes(query)
+    );
+  }, [products, productSearch]);
+
+  const filteredOrders = useMemo(() => {
+    let filtered = orders;
+    
+    if (orderSearch) {
+      const query = orderSearch.toLowerCase();
+      filtered = filtered.filter(o =>
+        o.robloxUsername.toLowerCase().includes(query) ||
+        o.phone.includes(query) ||
+        o.id.toLowerCase().includes(query)
+      );
+    }
+    
+    if (orderStatusFilter !== "all") {
+      filtered = filtered.filter(o => o.status === orderStatusFilter);
+    }
+    
+    return filtered;
+  }, [orders, orderSearch, orderStatusFilter]);
 
   if (!isAuthenticated) {
     return (
@@ -369,11 +503,34 @@ export default function AdminPage() {
 
           <TabsContent value="orders">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
                   All Orders
                 </CardTitle>
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search orders..."
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      className="pl-9 w-48"
+                      data-testid="input-order-search"
+                    />
+                  </div>
+                  <Select value={orderStatusFilter} onValueChange={setOrderStatusFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-order-status-filter">
+                      <SelectValue placeholder="Filter status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      {ORDER_STATUSES.map(s => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -381,62 +538,59 @@ export default function AdminPage() {
                     <Clock className="mx-auto mb-2 h-8 w-8 animate-spin text-muted-foreground" />
                     <p className="text-muted-foreground">Loading orders...</p>
                   </div>
-                ) : orders.length === 0 ? (
+                ) : filteredOrders.length === 0 ? (
                   <div className="py-8 text-center">
                     <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                    <p className="text-muted-foreground">No orders yet</p>
+                    <p className="text-muted-foreground">No orders found</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {orders.map((order) => {
-                      let items: { name: string; quantity: number }[] = [];
-                      try {
-                        items = JSON.parse(order.items);
-                      } catch {
-                        items = [];
-                      }
+                  <ScrollArea className="h-[500px]">
+                    <div className="space-y-3">
+                      {filteredOrders.map((order) => {
+                        const items = getOrderItems(order);
 
-                      return (
-                        <div
-                          key={order.id}
-                          className="flex items-center justify-between gap-4 rounded-lg border p-4 flex-wrap"
-                          data-testid={`admin-order-${order.id}`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-sm font-medium">
-                                #{order.id.slice(0, 8)}
-                              </span>
-                              <Badge className={statusColors[order.status] || ""}>
-                                {order.status}
-                              </Badge>
-                              {order.receiptUrl && (
-                                <Badge variant="outline" className="gap-1">
-                                  <CheckCircle className="h-3 w-3" />
-                                  Receipt
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {order.robloxUsername} - {order.totalAmount} EGP
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {items.length} items - {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedOrder(order)}
-                            className="gap-1"
+                        return (
+                          <div
+                            key={order.id}
+                            className="flex items-center justify-between gap-4 rounded-lg border p-4 flex-wrap"
+                            data-testid={`admin-order-${order.id}`}
                           >
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-sm font-medium">
+                                  #{order.id.slice(0, 8)}
+                                </span>
+                                <Badge className={statusColors[order.status] || ""}>
+                                  {order.status}
+                                </Badge>
+                                {order.receiptUrl && (
+                                  <Badge variant="outline" className="gap-1">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Receipt
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {order.robloxUsername} - {order.totalAmount} EGP
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {items.length} items - {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedOrder(order)}
+                              className="gap-1"
+                            >
+                              <Eye className="h-3 w-3" />
+                              View
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 )}
               </CardContent>
             </Card>
@@ -444,44 +598,65 @@ export default function AdminPage() {
 
           <TabsContent value="products">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <ShoppingBag className="h-5 w-5" />
                   Products
                 </CardTitle>
-                {products.length === 0 && (
-                  <Button
-                    onClick={() => seedProductsMutation.mutate()}
-                    disabled={seedProductsMutation.isPending}
-                    data-testid="button-seed-products"
-                  >
-                    {seedProductsMutation.isPending ? "Seeding..." : "Seed Products"}
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search products..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="pl-9 w-48"
+                      data-testid="input-product-search"
+                    />
+                  </div>
+                  <Button onClick={() => setShowAddProduct(true)} className="gap-2" data-testid="button-add-product">
+                    <Plus className="h-4 w-4" />
+                    Add Product
                   </Button>
-                )}
+                  {products.length === 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => seedProductsMutation.mutate()}
+                      disabled={seedProductsMutation.isPending}
+                      data-testid="button-seed-products"
+                    >
+                      {seedProductsMutation.isPending ? "Seeding..." : "Seed Products"}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {products.length === 0 ? (
                   <div className="py-8 text-center">
                     <ShoppingBag className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                     <p className="text-muted-foreground mb-4">No products in database</p>
-                    <p className="text-sm text-muted-foreground">Click "Seed Products" to import products</p>
+                    <p className="text-sm text-muted-foreground">Click "Seed Products" to import products or "Add Product" to create one</p>
                   </div>
                 ) : (
                   <ScrollArea className="h-[500px]">
                     <div className="space-y-2">
-                      {products.map((product) => (
+                      {filteredProducts.map((product) => (
                         <div
                           key={product.id}
                           className="flex items-center justify-between gap-4 rounded-lg border p-3 flex-wrap"
                           data-testid={`admin-product-${product.id}`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {product.imageUrl && (
+                            {product.imageUrl ? (
                               <img 
                                 src={product.imageUrl} 
                                 alt={product.name}
                                 className="h-10 w-10 rounded object-cover"
                               />
+                            ) : (
+                              <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                                <ShoppingBag className="h-5 w-5 text-muted-foreground" />
+                              </div>
                             )}
                             <div className="min-w-0">
                               <p className="font-medium truncate">{product.name}</p>
@@ -497,14 +672,41 @@ export default function AdminPage() {
                                 Stock: {product.inStock ?? 0}
                               </p>
                             </div>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => handleEditProduct(product)}
-                              data-testid={`button-edit-product-${product.id}`}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleEditProduct(product)}
+                                data-testid={`button-edit-product-${product.id}`}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    data-testid={`button-delete-product-${product.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Product?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete "{product.name}". This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteProductMutation.mutate(product.id)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -669,7 +871,7 @@ export default function AdminPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Clear Completed Orders?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete {completedOrders} completed orders and their chat messages. This action cannot be undone.
+                              This will permanently delete {completedOrders} completed orders and their chat messages.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -703,7 +905,7 @@ export default function AdminPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Clear Cancelled Orders?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete {cancelledOrders} cancelled orders and their chat messages. This action cannot be undone.
+                              This will permanently delete {cancelledOrders} cancelled orders and their chat messages.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -737,7 +939,7 @@ export default function AdminPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Clear All Completed & Cancelled?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete {completedOrders + cancelledOrders} orders and all their chat messages. This action cannot be undone.
+                              This will permanently delete {completedOrders + cancelledOrders} orders and all their chat messages.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -757,7 +959,7 @@ export default function AdminPage() {
         </Tabs>
 
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
             <DialogHeader>
               <DialogTitle>
                 Order #{selectedOrder?.id.slice(0, 8)}
@@ -784,6 +986,29 @@ export default function AdminPage() {
                   <div className="flex justify-between gap-4 flex-wrap">
                     <span className="text-muted-foreground">Total</span>
                     <span className="font-bold">{selectedOrder.totalAmount} EGP</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">Order Items:</p>
+                  <div className="space-y-2 max-h-48 overflow-auto">
+                    {getOrderItems(selectedOrder).map((item, index) => (
+                      <div key={index} className="flex items-center gap-3 rounded-lg border p-2">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="h-10 w-10 rounded object-cover" />
+                        ) : (
+                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Qty: {item.quantity} {item.price && `- ${item.price} EGP each`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -870,6 +1095,111 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Product</DialogTitle>
+              <DialogDescription>
+                Create a new product in the catalog
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-name">Name *</Label>
+                  <Input
+                    id="new-name"
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                    data-testid="input-new-product-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-price">Price (EGP) *</Label>
+                  <Input
+                    id="new-price"
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                    data-testid="input-new-product-price"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={newProduct.category} onValueChange={(v) => setNewProduct({...newProduct, category: v})}>
+                    <SelectTrigger data-testid="select-new-product-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Rarity</Label>
+                  <Select value={newProduct.rarity} onValueChange={(v) => setNewProduct({...newProduct, rarity: v})}>
+                    <SelectTrigger data-testid="select-new-product-rarity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RARITIES.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-description">Description</Label>
+                <Textarea
+                  id="new-description"
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                  data-testid="input-new-product-description"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-image">Image URL</Label>
+                  <Input
+                    id="new-image"
+                    value={newProduct.imageUrl}
+                    onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                    placeholder="/products/..."
+                    data-testid="input-new-product-image"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-stock">Stock</Label>
+                  <Input
+                    id="new-stock"
+                    type="number"
+                    value={newProduct.inStock}
+                    onChange={(e) => setNewProduct({...newProduct, inStock: e.target.value})}
+                    data-testid="input-new-product-stock"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowAddProduct(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateProduct}
+                  disabled={createProductMutation.isPending}
+                  data-testid="button-create-product"
+                >
+                  {createProductMutation.isPending ? "Creating..." : "Create Product"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
